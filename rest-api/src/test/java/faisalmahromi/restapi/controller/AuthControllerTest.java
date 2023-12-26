@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import faisalmahromi.restapi.entity.User;
 import faisalmahromi.restapi.model.LoginUserRequest;
 import faisalmahromi.restapi.model.TokenResponse;
+import faisalmahromi.restapi.model.UpdateUserRequest;
 import faisalmahromi.restapi.model.WebResponse;
 import faisalmahromi.restapi.repository.UserRepository;
 import faisalmahromi.restapi.security.BCrypt;
@@ -116,6 +117,51 @@ class AuthControllerTest {
             assertNotNull(userDb);
             assertEquals(userDb.getToken(), response.getData().getToken());
             assertEquals(userDb.getTokenExpiredAt(), response.getData().getExpiredAt());
+        });
+    }
+
+    @Test
+    void logoutFailed() throws Exception {
+        mockMvc.perform(
+                delete("/api/auth/logout")
+                        .accept(MediaType.APPLICATION_JSON)
+        ).andExpectAll(
+                status().isUnauthorized()
+        ).andDo(result -> {
+            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
+            });
+
+            assertNotNull(response.getErrors());
+        });
+    }
+
+    @Test
+    void logoutSuccess() throws Exception {
+        User user = new User();
+        user.setName("Test");
+        user.setUsername("test");
+        user.setPassword("password");
+        user.setToken("test");
+        user.setTokenExpiredAt(System.currentTimeMillis() + 1000000000L);
+        userRepository.save(user);
+        mockMvc.perform(
+                delete("/api/auth/logout")
+                        .accept(MediaType.APPLICATION_JSON)
+                        .header("X-API-TOKEN", "test")
+        ).andExpectAll(
+                status().isOk()
+        ).andDo(result -> {
+            WebResponse<String> response = objectMapper.readValue(result.getResponse().getContentAsString(), new TypeReference<>() {
+            });
+
+            assertNull(response.getErrors());
+            assertEquals("OK", response.getData());
+
+            User userDb = userRepository.findById(user.getUsername()).orElse(null);
+            assertNotNull(userDb);
+            assertNull(userDb.getTokenExpiredAt());
+            assertNull(userDb.getToken());
+
         });
     }
 
